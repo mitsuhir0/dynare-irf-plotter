@@ -288,7 +288,7 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
     for j in range(i + 1, len(axes)):
         axes[j].set_visible(False)
 
-    fig.suptitle(f"IRFs to shock: {suptitle}", fontsize=16)
+    fig.suptitle(f"Impulse Responses to {suptitle}", fontsize=16)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
