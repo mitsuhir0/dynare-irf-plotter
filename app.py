@@ -1,5 +1,5 @@
 import streamlit as st
-from main import load, get_irf, plot_irf_df, convert, get_irf_endo_vars, dump_figure
+from dynare_irf_utils import load, get_irf, plot_irf_df, convert, get_irf_endo_vars, dump_figure
 from datetime import datetime
 from matplotlib.figure import Figure
 import os
