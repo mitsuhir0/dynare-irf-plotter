@@ -88,18 +88,18 @@ def get_irf_endo_vars(oo_: mat_struct, M_: mat_struct) -> dict[str, list[str]]:
     """
     irfs = oo_.irfs
 
-    # 変数名とショック名を取得
+    # Get variable names and shock names
     endo_names = get_endo_names(M_, long=False)
     exo_names = get_exo_names(M_, long=False)
 
-    # IRFデータを辞書に変換
+    # Convert IRF data to a dictionary
     irf_dict = {
         name: getattr(irfs, name)
         for name in dir(irfs)
         if not name.startswith('__') and isinstance(getattr(irfs, name), np.ndarray)
     }
 
-    # IRFをショックごとにグループ化（データ不要、名前のみ）
+    # Group IRFs by shock (names only, no data)
     used_vars_by_shock = defaultdict(list)
     for full_name in irf_dict:
         for shock in exo_names:
@@ -109,7 +109,7 @@ def get_irf_endo_vars(oo_: mat_struct, M_: mat_struct) -> dict[str, list[str]]:
                     used_vars_by_shock[shock].append(var)
                 break
 
-    # 重複排除とソート（好みに応じて）
+    # Remove duplicates and sort (optional)
     for shock in used_vars_by_shock:
         used_vars_by_shock[shock] = sorted(set(used_vars_by_shock[shock]))
 
@@ -128,17 +128,17 @@ def get_irf(oo_: mat_struct, M_: mat_struct) -> dict[str, pd.DataFrame]:
     endo_names = get_endo_names(M_, long=False)
     exo_names = get_exo_names(M_, long=False)
 
-    # IRFデータを辞書に変換
+    # Convert IRF data to a dictionary
     irf_dict = {
         name: getattr(irfs, name)
         for name in dir(irfs)
         if not name.startswith('__') and isinstance(getattr(irfs, name), np.ndarray)
     }
 
-    # IRFに使用された変数名だけ取得（依存関数）
+    # Get variable names used in IRFs (dependent function)
     used_vars_by_shock = get_irf_endo_vars(oo_, M_)
 
-    # IRFをショックごとにグループ化
+    # Group IRFs by shock
     shock_dfs = {}
     for shock, vars_for_shock in used_vars_by_shock.items():
         var_data = {
@@ -159,30 +159,30 @@ def to_endo_name_long(short_name: str, M_: mat_struct) -> str:
     """
     Convert a short variable name to its long name using M_.endo_names and M_.endo_names_long."""
 
-    # 名前リストを取り出して文字列に変換
+    # Extract name lists and convert to strings
     short, long = get_endo_names_all(M_)
 
-    # 辞書を使わずに検索
+    # Search without using a dictionary
     try:
         idx = short.index(short_name)
         return long[idx]
     except ValueError:
-        raise KeyError(f"変数名 '{short_name}' は M_.endo_names に見つかりませんでした。")
+        raise KeyError(f"Variable name '{short_name}' was not found in M_.endo_names.")
 
 
 def to_endo_name_short(long_name: str, M_: mat_struct) -> str:
     """
     Convert a long variable name to its short name using M_.endo_names and M_.endo_names_long.
     """
-    # 名前リストを取り出して文字列に変換
+    # Extract name lists and convert to strings
     short, long = get_endo_names_all(M_)
 
-    # 辞書を使わずに検索
+    # Search without using a dictionary
     try:
         idx = long.index(long_name)
         return short[idx]
     except ValueError:
-        raise KeyError(f"変数名 '{long_name}' は M_.endo_names_long に見つかりませんでした。")
+        raise KeyError(f"Variable name '{long_name}' was not found in M_.endo_names_long.")
 
 
 
@@ -190,7 +190,7 @@ def to_exo_name_long(short_name: str, M_: mat_struct) -> str:
     """
     Convert a short shock name to its long name using M_.exo_names and M_.exo_names_long.
     """
-    # 名前リストを取り出して文字列に変換
+    # Extract name lists and convert to strings
     short, long = get_exo_names_all(M_)
 
     try:
@@ -200,14 +200,14 @@ def to_exo_name_long(short_name: str, M_: mat_struct) -> str:
         return long[idx]
 
     except ValueError:
-        raise KeyError(f"ショック名 '{short_name}' は M_.exo_names に見つかりませんでした。")
+        raise KeyError(f"Shock name '{short_name}' was not found in M_.exo_names.")
 
 
 def to_exo_name_short(long_name: str, M_: mat_struct) -> str:
     """
     Convert a short shock name to its long name using M_.exo_names and M_.exo_names_long.
     """
-    # 名前リストを取り出して文字列に変換
+    # Extract name lists and convert to strings
     short, long = get_exo_names_all(M_)
 
     try:
@@ -217,12 +217,12 @@ def to_exo_name_short(long_name: str, M_: mat_struct) -> str:
         return short[idx]
 
     except ValueError:
-        raise KeyError(f"ショック名 '{long_name}' は M_.exo_names_long に見つかりませんでした。")
+        raise KeyError(f"Shock name '{long_name}' was not found in M_.exo_names_long.")
 
 
 
 def convert(name: str, M_: mat_struct, vartype: str, length: str) -> str:
-    """内生変数または外生変数をshortnameまたはlongnameに変換する関数
+    """Convert endogenous or exogenous variable names to short or long names.
 
     Parameters
     ----------
@@ -257,18 +257,18 @@ def convert(name: str, M_: mat_struct, vartype: str, length: str) -> str:
 def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols: int=3, M_: mat_struct = None, xlabel: str = None, ylabel: str = None, suptitle: str = None) -> Figure:
     irf_df = df[endo_names]
 
-    n_series = irf_df.shape[1]  # 系列数（列の数）
+    n_series = irf_df.shape[1]  # Number of series (columns)
     n_rows = math.ceil(n_series / n_cols)
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 3 * n_rows))
-    axes = np.array(axes).reshape(-1)  # 軸を1次元にして扱いやすくする
+    axes = np.array(axes).reshape(-1)  # Flatten axes for easier handling
 
     for i, col in enumerate(irf_df.columns):
         if M_ is not None:
-            # M_が指定されている場合、長い名前に変換
+            # If M_ is specified, convert to long name
             title = convert(col, M_, vartype='endo', length='long')
             if suptitle is None:
-                # suptitleが指定されていない場合、ショック名を長い名前に変換
+                # If suptitle is not specified, convert shock name to long name
                 suptitle = convert(shock_name, M_, vartype='exo', length='long')
         else:
             title = col
@@ -284,7 +284,7 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
         if ylabel is not None:
             ax.set_ylabel(ylabel)
 
-    # 余った subplot を非表示にする
+    # Hide unused subplots
     for j in range(i + 1, len(axes)):
         axes[j].set_visible(False)
 
@@ -309,7 +309,7 @@ def main():
     M_ = data['M_']
 
     shock_dfs = get_irf(oo_, M_)
-    # ✅ 結果の確認（例：euショックのIRF）
+    # ✅ Check results (example: IRF for shock 'eu')
 
     df = shock_dfs['shock_a1']
 

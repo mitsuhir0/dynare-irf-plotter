@@ -4,7 +4,6 @@ from datetime import datetime
 from matplotlib.figure import Figure
 import os
 import io
-import tempfile
 
 
 def remove_suptitle(fig: Figure) -> Figure:
@@ -56,10 +55,10 @@ with st.expander("How to Use"):
     ```
     """)
 
-# サンプルファイルを使用するオプション
+# Option to use a sample file
 use_sample_file = st.checkbox("Try the demo with the sample MAT file")
 if use_sample_file:
-    # サンプルファイルに関する注釈を追加
+    # Add notes about the sample file
     with st.expander("About the sample.mat file"):
         st.markdown("""
         ### About the sample.mat File
@@ -106,9 +105,9 @@ elif uploaded_file is not None:
     mat_file_path = uploaded_file
 
 if mat_file_path is not None:
-    if isinstance(mat_file_path, str):  # サンプルファイルのパス
+    if isinstance(mat_file_path, str):  # Path to the sample file
         data = load(mat_file_path)
-    else:  # アップロードされたファイル (BytesIO)
+    else:  # Uploaded file (BytesIO)
         data = load(mat_file_path)
 
     oo_ = data.get('oo_', None)
@@ -117,46 +116,46 @@ if mat_file_path is not None:
     if oo_ is None:
         st.error("The uploaded MAT file does not contain 'oo_' data.")
     else:
-        # `endo_names_long` の一覧を取得
+        # Retrieve the list of endo_names_long
         endo_vars_shocks = get_irf_endo_vars(oo_, M_)
         endo_vars = endo_vars_shocks[list(endo_vars_shocks.keys())[0]]
 
         endo_names_long = sorted([convert(name, M_, vartype='endo', length='long') for name in endo_vars])
 
-        # ユーザーに内生変数を選択させる
+        # Allow the user to select endogenous variables
         selected_endo_names_long = st.multiselect(
             "Select endogenous variables to plot:",
             options=endo_names_long,
-            default=endo_names_long[:5]  # デフォルトで最初の5つを選択
+            default=endo_names_long[:5]  # Select the first 5 by default
         )
 
         if selected_endo_names_long:
-            # 選択された変数を short name に変換
+            # Convert selected variables to short names
             selected_endo_names_short = [
                 convert(long_name, M_, vartype='endo', length='short') for long_name in selected_endo_names_long
             ]
 
-            # IRF データフレームの取得
+            # Retrieve IRF dataframes
             shock_dfs = get_irf(oo_, M_)
 
-            # ショックリストを取得
+            # Retrieve the list of shocks
             shock_list = list(shock_dfs.keys())
             long_shock_list = [convert(shock, M_, vartype='exo', length='long') for shock in shock_list]
 
-            # ユーザーにショックを選択させる
+            # Allow the user to select shocks
             selected_shocks = st.selectbox(
                 "Select shocks to plot:",
                 options=long_shock_list,
-                index=0  # デフォルトで最初の1つを選択
+                index=0  # Select the first one by default
             )
 
-            # オプション設定
+            # Plot options
             with st.expander("Plot Options"):
                 n_col = st.number_input(
                     "Number of columns for the plot layout:",
                     min_value=1,
                     max_value=5,
-                    value=2,  # デフォルト値
+                    value=2,  # Default value
                     step=1
                 )
                 plot_xlabel = st.text_input("X-axis label:", value="Time")
@@ -165,18 +164,18 @@ if mat_file_path is not None:
                     "Number of periods to plot:",
                     min_value=1,
                     max_value=100,
-                    value=len(shock_dfs[shock_list[0]]),  # デフォルト値
+                    value=len(shock_dfs[shock_list[0]]),  # Default value
                     step=1
                 )
 
             if selected_shocks:
-                # 選択されたショックごとにプロット
+                # Plot for each selected shock
                 for long_shock_name in [selected_shocks, ]:
                     shock_name = convert(long_shock_name, M_, vartype='exo', length='short')
                     df = shock_dfs[shock_name]
                     st.subheader(f"Shock: {long_shock_name}")
 
-                    # プロット
+                    # Plot
                     fig = plot_irf_df(
                         df[:perods],
                         selected_endo_names_short,
@@ -188,11 +187,11 @@ if mat_file_path is not None:
                     )
                     st.pyplot(fig)
 
-                    # データフレームを表示
+                    # Display the dataframe
                     with st.expander("Display IRF Data"):
                         st.write(df)
 
-                    # ファイル名の生成
+                    # Generate file name
                     if uploaded_file is not None:
                         mat_file_name = os.path.splitext(uploaded_file.name)[0]
                     else:
@@ -200,7 +199,7 @@ if mat_file_path is not None:
                     today_date = datetime.now().strftime("%Y-%m-%d")
                     base_file_name = f"{mat_file_name}_{long_shock_name}_{today_date}"
 
-                    # 保存形式を選択して即時ダウンロード
+                    # Select file format and download immediately
                     include_title = st.checkbox("Include figure title in the exported file", value=True)
                     fig_for_save = fig if include_title else remove_suptitle(fig)
                     file_format = st.selectbox(
@@ -287,7 +286,7 @@ This tool is provided "as is" without any guarantees of accuracy. The authors an
 """)
 
 
-# 著作権表記をフッターに追加
+# Add copyright notice to the footer
 st.markdown("""
 ---
 © 2025 [mitsuhir0](https://github.com/mitsuhir0). All rights reserved.
