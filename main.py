@@ -3,6 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib_fontja
+import matplotlib
+import pickle
+
 
 from scipy.io import loadmat
 from matplotlib.figure import Figure
@@ -251,7 +254,7 @@ def convert(name: str, M_: mat_struct, vartype: str, length: str) -> str:
         raise ValueError("vartype must be 'endo' for endogenous or 'exo' for exogenous.")
 
 
-def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols: int=3, M_: mat_struct = None) -> Figure:
+def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols: int=3, M_: mat_struct = None, xlabel: str = None, ylabel: str = None, suptitle: str = None) -> Figure:
     irf_df = df[endo_names]
 
     n_series = irf_df.shape[1]  # 系列数（列の数）
@@ -264,7 +267,9 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
         if M_ is not None:
             # M_が指定されている場合、長い名前に変換
             title = convert(col, M_, vartype='endo', length='long')
-            suptitle = convert(shock_name, M_, vartype='exo', length='long')
+            if suptitle is None:
+                # suptitleが指定されていない場合、ショック名を長い名前に変換
+                suptitle = convert(shock_name, M_, vartype='exo', length='long')
         else:
             title = col
         ax = axes[i]
@@ -273,6 +278,12 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
         ax.axhline(0, color='gray', linestyle='--')
         ax.grid(True)
 
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+
     # 余った subplot を非表示にする
     for j in range(i + 1, len(axes)):
         axes[j].set_visible(False)
@@ -280,6 +291,15 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
     fig.suptitle(f"IRFs to shock: {suptitle}", fontsize=16)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
+
+
+def dump_figure(fig: Figure) -> bytes:
+    info = {
+        'figure': fig,
+        'matplotlib_version': matplotlib.__version__,
+        'pickle_protocol': pickle.HIGHEST_PROTOCOL
+    }
+    return pickle.dumps(info, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def main():
