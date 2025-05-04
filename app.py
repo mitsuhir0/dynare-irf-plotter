@@ -1,5 +1,5 @@
 import streamlit as st
-from main import load, get_irf, plot_irf_df, get_endo_names_short
+from main import load, get_irf, plot_irf_df, convert, get_irf_endo_vars
 
 
 st.set_page_config(
@@ -21,7 +21,11 @@ if uploaded_file is not None:
         st.error("The uploaded MAT file does not contain 'oo_' data.")
     else:
         # `endo_names_long` の一覧を取得
-        endo_names_long = sorted([str(name).strip() for name in M_.endo_names_long])
+        endo_vars_shocks = get_irf_endo_vars(oo_, M_)
+        endo_vars = endo_vars_shocks[list(endo_vars_shocks.keys())[0]]
+
+        print(endo_vars)
+        endo_names_long = sorted([convert(name, M_, vartype='endo', length='long') for name in endo_vars])
 
         # ユーザーに内生変数を選択させる
         selected_endo_names_long = st.multiselect(
@@ -42,7 +46,7 @@ if uploaded_file is not None:
         if selected_endo_names_long:
             # 選択された変数を short name に変換
             selected_endo_names_short = [
-                get_endo_names_short(long_name, M_) for long_name in selected_endo_names_long
+                convert(long_name, M_, vartype='endo', length='short') for long_name in selected_endo_names_long
             ]
 
             # IRF データフレームの取得
@@ -50,19 +54,22 @@ if uploaded_file is not None:
 
             # ショックリストを取得
             shock_list = list(shock_dfs.keys())
+            long_shock_list = [convert(shock, M_, vartype='exo', length='long') for shock in shock_list]
+
 
             # ユーザーにショックを選択させる
             selected_shocks = st.multiselect(
                 "Select shocks to plot:",
-                options=shock_list,
-                default=shock_list[:1]  # デフォルトで最初の1つを選択
+                options=long_shock_list,  # 修正: long_shock_listを使用
+                default=long_shock_list[:1]  # デフォルトで最初の1つを選択
             )
 
             if selected_shocks:
                 # 選択されたショックごとにプロット
-                for shock_name in selected_shocks:
+                for long_shock_name in selected_shocks:
+                    shock_name = convert(long_shock_name, M_, vartype='exo', length='short')
                     df = shock_dfs[shock_name]
-                    st.subheader(f"Shock: {shock_name}")
+                    st.subheader(f"Shock: {long_shock_name}")
 
                     # プロット
                     st.pyplot(plot_irf_df(df, selected_endo_names_short, shock_name, n_cols=n_col, M_=M_))
