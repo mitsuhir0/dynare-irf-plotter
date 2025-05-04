@@ -304,16 +304,16 @@ def dump_figure(fig: Figure) -> bytes:
 
 def main():
 
-    data = load('result.mat')
+    data = load('sample.mat')
     oo_ = data['oo_']
     M_ = data['M_']
 
     shock_dfs = get_irf(oo_, M_)
     # ✅ Check results (example: IRF for shock 'eu')
 
-    df = shock_dfs['shock_a1']
+    df = shock_dfs['eps_u']
 
-    plot_irf_df(df, ['a1', 'a2', 'e', 'pi1', 'pi2', 'y1'], 'shock_a1', M_=M_)
+    plot_irf_df(df, df.columns, 'eps_u', M_=M_, n_cols=2)
     plt.show()
 
 

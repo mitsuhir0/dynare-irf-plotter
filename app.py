@@ -29,8 +29,6 @@ st.set_page_config(
 st.title("IRF Plotter for MAT Files")
 
 
-# ...existing code...
-
 st.markdown("""
 This tool allows you to upload MATLAB `.mat` files containing `oo_` and `M_` data to visualize impulse response functions (IRFs). It helps in selecting variables and shocks for plotting and provides options to customize and download the plots.
 """)
@@ -40,7 +38,7 @@ with st.expander("How to Use"):
     ### Instructions:
     1. Upload a `.mat` file containing `oo_` and `M_` data.
     2. Ensure that `oo_` includes the impulse response functions (IRFs).
-    3. Select the endogenous variables and shocks to plot the IRFs.
+    3. Select endogenous variables and shocks to plot the IRFs.
 
     #### Example for saving in MATLAB:
     ```matlab
@@ -56,7 +54,7 @@ with st.expander("How to Use"):
     """)
 
 # Option to use a sample file
-use_sample_file = st.checkbox("Try the demo with the sample MAT file")
+use_sample_file = st.checkbox("Try the demo with a sample MAT file")
 if use_sample_file:
     # Add notes about the sample file
     with st.expander("About the sample.mat file"):
@@ -68,7 +66,7 @@ if use_sample_file:
         - **MOD File**: [Gali_2015_chapter_5_commitment.mod](https://github.com/JohannesPfeifer/DSGE_mod/blob/master/Gali_2015/Gali_2015_chapter_5_commitment.mod)
         - **Source Repository**: [Johannes Pfeifer's DSGE Mod Repository](https://github.com/JohannesPfeifer)
 
-        This `.mod` file replicates the commitment case from Chapter 5 of Gali (2015).
+        This `.mod` file replicates the commitment case described in Chapter 5 of Gali (2015).
 
         #### How to Generate the File
         1. Clone the repository from [Johannes Pfeifer's GitHub](https://github.com/JohannesPfeifer).
@@ -77,7 +75,7 @@ if use_sample_file:
            ```bash
            dynare Gali_2015_chapter_5_commitment.mod
            ```
-        4. Save the results as [sample.mat](http://_vscodecontentref_/1):
+        4. Save the results as `sample.mat`
            ```matlab
            save('sample.mat', 'oo_', 'M_')
            ```
