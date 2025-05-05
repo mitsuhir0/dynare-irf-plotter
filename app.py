@@ -258,8 +258,7 @@ if mat_file_path is not None:
                             with open('saved_figure.pkl', 'rb') as f:
                                 data = pickle.load(f)
 
-                            info = pickle.loads(data)
-                            fig = info['figure']
+                            fig = data['figure']
 
                             # Get all axes from the figure
                             axes = fig.get_axes()
