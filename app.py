@@ -111,6 +111,12 @@ if mat_file_path is not None:
     oo_ = data.get('oo_', None)
     M_ = data.get('M_', None)
 
+    # fix typos in orginal Dynare file
+    if use_sample_file:
+        target = "monetary policy shock"
+        replacement = "cost push shock"
+        M_.exo_names_long = [replacement if s == target else s for s in M_.exo_names_long]
+
     if oo_ is None:
         st.error("The uploaded MAT file does not contain 'oo_' data.")
     else:
@@ -194,8 +200,7 @@ if mat_file_path is not None:
                         mat_file_name = os.path.splitext(uploaded_file.name)[0]
                     else:
                         mat_file_name = "sample"
-                    today_date = datetime.now().strftime("%Y-%m-%d")
-                    base_file_name = f"{mat_file_name}_{long_shock_name}_{today_date}"
+                    base_file_name = f"{mat_file_name}_{shock_name}"
 
                     # Select file format and download immediately
                     include_title = st.checkbox("Include figure title in the exported file", value=True)
@@ -253,20 +258,22 @@ if mat_file_path is not None:
                             with open('saved_figure.pkl', 'rb') as f:
                                 data = pickle.load(f)
 
-                            # Extract the figure object
-                            fig = data['figure']
+                            info = pickle.loads(data)
+                            fig = info['figure']
 
                             # Get all axes from the figure
                             axes = fig.get_axes()
 
                             # Modify all axes
                             for ax in axes:
-                                for line in ax.get_lines():  # Iterate over all lines in the axis
+                                lines = ax.get_lines()  # Get all lines in the axis
+                                if lines:  # Check if there are any lines
+                                    line = lines[0]  # Select the first line
                                     line.set_linestyle('--')  # Set the line style to dashed
                                     line.set_marker('o')     # Add circle markers
 
                             # Display the modified figure
-                            plt.show(fig)
+                            plt.show()
                             ```
                             """)
             else:
