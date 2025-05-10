@@ -53,14 +53,11 @@ def get_mat_file(use_sample_file, uploaded_file) -> tuple:
     return None, None
 
 
-def fix_dynare_typo(M_: Mat, use_sample_file: bool) -> Mat:
+def fix_dynare_typo(M_: Mat) -> Mat:
     """Dynareファイルのtypo修正"""
-    if use_sample_file:
-        target = "monetary policy shock"
-        replacement = "cost push shock"
-        M_.exo_names_long = [
-            replacement if s == target else s for s in M_.exo_names_long
-        ]
+    target = "monetary policy shock"
+    replacement = "cost push shock"
+    M_.exo_names_long = [replacement if s == target else s for s in M_.exo_names_long]
     return M_
 
 
@@ -98,19 +95,18 @@ def get_shock_lists(
 
 
 def plot_and_download_irf(
-    irfs,
-    selected_endo_names_short,
-    shock_name,
-    n_col,
-    M_,
-    xlabel,
-    ylabel,
-    perods,
-    mat_file_name,
-    fig_title,
-    text,
-    file_format,
-):
+    irfs: pd.DataFrame,
+    selected_endo_names_short: list[str],
+    shock_name: str,
+    n_col: int,
+    M_: Mat,
+    xlabel: str,
+    ylabel: str,
+    perods: int,
+    mat_file_name: str,
+    fig_title: str,
+    file_format: str,
+) -> None:
     """IRFプロットとダウンロード処理"""
     fig = plot_irf_df(
         irfs[:perods],
@@ -184,7 +180,8 @@ if mat_file_path is not None:
     data = load(mat_file_path)
     oo_ = data.get("oo_", None)
     M_ = data.get("M_", None)
-    M_ = fix_dynare_typo(M_, use_sample_file)
+    if use_sample_file:
+        M_ = fix_dynare_typo(M_)
 
     if oo_ is None:
         st.error("The uploaded MAT file does not contain 'oo_' data.")
@@ -254,7 +251,6 @@ if mat_file_path is not None:
                     perods,
                     mat_file_name,
                     include_title,
-                    text,
                     file_format,
                 )
             else:
