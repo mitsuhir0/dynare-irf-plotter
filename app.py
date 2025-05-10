@@ -1,7 +1,7 @@
 """Streamlit app for visualizing Dynare IRFs from MATLAB .mat files."""
 
 import io
-import os
+from pathlib import Path
 
 import streamlit as st
 from matplotlib.figure import Figure
@@ -42,15 +42,14 @@ st.set_page_config(
 )
 
 st.title("IRF Plotter for MAT Files")
+
 st.markdown(text.tool_description())
 
 with st.expander("How to Use"):
     st.markdown(text.instructions())
 
-# Option to use a sample file
 use_sample_file = st.checkbox("Try the demo with a sample MAT file")
 if use_sample_file:
-    # Add notes about the sample file
     with st.expander("About the sample.mat file"):
         st.markdown(text.about_sample())
 
@@ -64,15 +63,15 @@ if not use_sample_file:
         disabled=use_sample_file,
     )
 
-if use_sample_file:
     sample_file_path = "sample.mat"
-    if os.path.exists(sample_file_path):
+    if Path(sample_file_path).exists():
         mat_file_path = sample_file_path
     else:
         st.error("Sample MAT file (sample.mat) not found.")
+        st.error("Sample MAT file (sample.mat) not found.")
 
 elif uploaded_file is not None:
-    mat_file_name = os.path.splitext(uploaded_file.name)[0]
+    mat_file_name = Path(uploaded_file.name).stem
 
     mat_file_path = uploaded_file
 
@@ -98,7 +97,7 @@ if mat_file_path is not None:
     else:
         # Retrieve the list of endo_names_long
         endo_vars_shocks = get_irf_endo_vars(oo_, M_)
-        endo_vars = endo_vars_shocks[list(endo_vars_shocks.keys())[0]]
+        endo_vars = endo_vars_shocks[next(iter(endo_vars_shocks.keys()))]
 
         endo_names_long = sorted(
             [convert(name, M_, vartype="endo", length="long") for name in endo_vars],
@@ -162,12 +161,12 @@ if mat_file_path is not None:
                         vartype="exo",
                         length="short",
                     )
-                    df = shock_dfs[shock_name]
+                    irfs = shock_dfs[shock_name]
                     st.subheader(f"Shock: {long_shock_name}")
 
                     # Plot
                     fig = plot_irf_df(
-                        df[:perods],
+                        irfs[:perods],
                         selected_endo_names_short,
                         shock_name,
                         n_cols=n_col,
@@ -179,11 +178,11 @@ if mat_file_path is not None:
 
                     # Display the dataframe
                     with st.expander("Display IRF Data"):
-                        st.write(df)
+                        st.write(irfs)
 
                     # Generate file name
                     if uploaded_file is not None:
-                        mat_file_name = os.path.splitext(uploaded_file.name)[0]
+                        mat_file_name = Path(uploaded_file.name).stem
                     else:
                         mat_file_name = "sample"
                     base_file_name = f"{mat_file_name}_{shock_name}"
