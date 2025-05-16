@@ -1,45 +1,45 @@
+"""Utility functions for loading, processing, and plotting Dynare IRF
+
+(Impulse Response Function) data.
+"""
+
 import math
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib_fontja
-import matplotlib
 import pickle
-
-
-from scipy.io import loadmat
-from matplotlib.figure import Figure
-from scipy.io.matlab import mat_struct
 from collections import defaultdict
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.figure import Figure
+from scipy.io import loadmat
+from scipy.io.matlab import mat_struct
 
-def load(filename) -> dict[mat_struct]:
-    """
-    Load a .mat file and return the data.
-    """
+
+def load(filename: str) -> dict[mat_struct]:
+    """Load a .mat file and return the data."""
     return loadmat(filename, squeeze_me=True, struct_as_record=False)
 
 
-def get_endo_names(M_: mat_struct, long=False) -> list[str]:
-    """
-    Extract endogenous variable names from M_.
+def get_endo_names(M_: mat_struct, long: bool = False) -> list[str]:
+    """Extract endogenous variable names from M_.
+
     If long is True, return long names; otherwise, return short names.
     """
     if long:
-        if hasattr(M_, 'endo_names_long'):
+        if hasattr(M_, "endo_names_long"):
             return [str(name).strip() for name in np.atleast_1d(M_.endo_names_long)]
-        else:
-            raise AttributeError("M_ does not have 'endo_names_long' attribute.")
-    else:
-        if hasattr(M_, 'endo_names'):
-            return [str(name).strip() for name in np.atleast_1d(M_.endo_names)]
-        else:
-            raise AttributeError("M_ does not have 'endo_names' attribute.")
+        msg = "Missing attribute: endo_names_long"
+        raise AttributeError(msg)
+    if hasattr(M_, "endo_names"):
+        return [str(name).strip() for name in np.atleast_1d(M_.endo_names)]
+    msg = "M_ does not have 'endo_names' attribute."
+    raise AttributeError(msg)
 
 
 def get_endo_names_all(M_: mat_struct) -> tuple[list[str], list[str]]:
-    """
-    Extract both short and long endogenous variable names from M_.
+    """Extract both short and long endogenous variable names from M_.
+
     Returns a tuple of two lists: (short_names, long_names).
     """
     short = get_endo_names(M_, long=False)
@@ -48,24 +48,21 @@ def get_endo_names_all(M_: mat_struct) -> tuple[list[str], list[str]]:
 
 
 def get_exo_names(M_: mat_struct, long=False) -> list[str]:
-    """
-    Extract shock names from M_.
-    """
+    """Extract shock names from M_."""
     if long:
-        if hasattr(M_, 'exo_names_long'):
+        if hasattr(M_, "exo_names_long"):
             return [str(name).strip() for name in np.atleast_1d(M_.exo_names_long)]
-        else:
-            raise AttributeError("M_ does not have 'exo_names_long' attribute.")
-    else:
-        if not hasattr(M_, 'exo_names'):
-            raise AttributeError("M_ does not have 'exo_names' attribute.")
-        else:
-            return [str(name).strip() for name in np.atleast_1d(M_.exo_names)]
+        msg = "M_ does not have 'exo_names_long' attribute."
+        raise AttributeError(msg)
+    if not hasattr(M_, "exo_names"):
+        msg = "M_ does not have 'exo_names' attribute."
+        raise AttributeError(msg)
+    return [str(name).strip() for name in np.atleast_1d(M_.exo_names)]
 
 
 def get_exo_names_all(M_: mat_struct) -> tuple[list[str], list[str]]:
-    """
-    Extract both short and long shock names from M_.
+    """Extract both short and long shock names from M_.
+
     Returns a tuple of two lists: (short_names, long_names).
     """
     short = get_exo_names(M_, long=False)
@@ -73,18 +70,21 @@ def get_exo_names_all(M_: mat_struct) -> tuple[list[str], list[str]]:
     return short, long
 
 
-
 def get_irf_endo_vars(oo_: mat_struct, M_: mat_struct) -> dict[str, list[str]]:
-    """
-    Extract a list of endogenous variables used in IRFs for each shock.
+    """Extract a list of endogenous variables used in IRFs for each shock.
 
-    Parameters:
-        oo_ (mat_struct): The oo_ object from Dynare .mat file.
-        M_ (mat_struct): The M_ object from Dynare .mat file.
+    Parameters
+    ----------
+    oo_ : mat_struct
+        The oo_ object from Dynare .mat file, containing IRF results.
+    M_ : mat_struct
+        The M_ object from Dynare .mat file, containing model variable names.
 
-    Returns:
-        dict[str, list[str]]: A dictionary mapping each exogenous shock name
-                              to a list of endogenous variables that have IRFs.
+    Returns
+    -------
+    dict[str, list[str]]
+        A dictionary mapping each exogenous shock name to a list of endogenous variables that have IRFs.
+
     """
     irfs = oo_.irfs
 
@@ -96,15 +96,15 @@ def get_irf_endo_vars(oo_: mat_struct, M_: mat_struct) -> dict[str, list[str]]:
     irf_dict = {
         name: getattr(irfs, name)
         for name in dir(irfs)
-        if not name.startswith('__') and isinstance(getattr(irfs, name), np.ndarray)
+        if not name.startswith("__") and isinstance(getattr(irfs, name), np.ndarray)
     }
 
     # Group IRFs by shock (names only, no data)
     used_vars_by_shock = defaultdict(list)
     for full_name in irf_dict:
         for shock in exo_names:
-            if full_name.endswith(f'_{shock}'):
-                var = full_name[:-(len(shock)+1)]
+            if full_name.endswith(f"_{shock}"):
+                var = full_name[: -(len(shock) + 1)]
                 if var in endo_names:
                     used_vars_by_shock[shock].append(var)
                 break
@@ -114,25 +114,24 @@ def get_irf_endo_vars(oo_: mat_struct, M_: mat_struct) -> dict[str, list[str]]:
         used_vars_by_shock[shock] = sorted(set(used_vars_by_shock[shock]))
 
     if not used_vars_by_shock:
-        raise ValueError("No IRF variable names found for the given shocks.")
+        msg = "No IRF variable names found for the given shocks."
+        raise ValueError(msg)
 
     return dict(used_vars_by_shock)
 
 
 def get_irf(oo_: mat_struct, M_: mat_struct) -> dict[str, pd.DataFrame]:
-    """
-    Extract IRF data from the oo_ object using endo_names and exo_names from M_,
+    """Extract IRF data from the oo_ object using endo_names and exo_names from M_,
+
     and return a dictionary of DataFrames indexed by shock name.
     """
     irfs = oo_.irfs
-    endo_names = get_endo_names(M_, long=False)
-    exo_names = get_exo_names(M_, long=False)
 
     # Convert IRF data to a dictionary
     irf_dict = {
         name: getattr(irfs, name)
         for name in dir(irfs)
-        if not name.startswith('__') and isinstance(getattr(irfs, name), np.ndarray)
+        if not name.startswith("__") and isinstance(getattr(irfs, name), np.ndarray)
     }
 
     # Get variable names used in IRFs (dependent function)
@@ -150,15 +149,14 @@ def get_irf(oo_: mat_struct, M_: mat_struct) -> dict[str, pd.DataFrame]:
             shock_dfs[shock] = pd.DataFrame(var_data)
 
     if not shock_dfs:
-        raise ValueError("No IRF data found for the given shocks.")
+        msg = "No IRF data found for the given shocks."
+        raise ValueError(msg)
 
     return shock_dfs
 
 
 def to_endo_name_long(short_name: str, M_: mat_struct) -> str:
-    """
-    Convert a short variable name to its long name using M_.endo_names and M_.endo_names_long."""
-
+    """Convert a short variable name to its long name using M_.endo_names and M_.endo_names_long."""
     # Extract name lists and convert to strings
     short, long = get_endo_names_all(M_)
 
@@ -166,13 +164,15 @@ def to_endo_name_long(short_name: str, M_: mat_struct) -> str:
     try:
         idx = short.index(short_name)
         return long[idx]
-    except ValueError:
-        raise KeyError(f"Variable name '{short_name}' was not found in M_.endo_names.")
+    except ValueError as err:
+        msg = "Variable name not found in M_.endo_names."
+        raise KeyError(msg) from err
 
 
 def to_endo_name_short(long_name: str, M_: mat_struct) -> str:
-    """
-    Convert a long variable name to its short name using M_.endo_names and M_.endo_names_long.
+    """Convert a long variable name to its short name
+
+    using M_.endo_names and M_.endo_names_long.
     """
     # Extract name lists and convert to strings
     short, long = get_endo_names_all(M_)
@@ -182,13 +182,14 @@ def to_endo_name_short(long_name: str, M_: mat_struct) -> str:
         idx = long.index(long_name)
         return short[idx]
     except ValueError:
-        raise KeyError(f"Variable name '{long_name}' was not found in M_.endo_names_long.")
-
+        msg = f"Variable name '{long_name}' was not found in M_.endo_names_long."
+        raise KeyError(msg) from None
 
 
 def to_exo_name_long(short_name: str, M_: mat_struct) -> str:
-    """
-    Convert a short shock name to its long name using M_.exo_names and M_.exo_names_long.
+    """Convert a short shock name to its long name
+
+    using M_.exo_names and M_.exo_names_long.
     """
     # Extract name lists and convert to strings
     short, long = get_exo_names_all(M_)
@@ -200,12 +201,14 @@ def to_exo_name_long(short_name: str, M_: mat_struct) -> str:
         return long[idx]
 
     except ValueError:
-        raise KeyError(f"Shock name '{short_name}' was not found in M_.exo_names.")
+        msg = f"Shock name '{short_name}' was not found in M_.exo_names."
+        raise KeyError(msg) from None
 
 
 def to_exo_name_short(long_name: str, M_: mat_struct) -> str:
-    """
-    Convert a short shock name to its long name using M_.exo_names and M_.exo_names_long.
+    """Convert a short shock name to its long name
+
+    using M_.exo_names and M_.exo_names_long.
     """
     # Extract name lists and convert to strings
     short, long = get_exo_names_all(M_)
@@ -217,8 +220,8 @@ def to_exo_name_short(long_name: str, M_: mat_struct) -> str:
         return short[idx]
 
     except ValueError:
-        raise KeyError(f"Shock name '{long_name}' was not found in M_.exo_names_long.")
-
+        msg = f"Shock name '{long_name}' was not found in M_.exo_names_long."
+        raise KeyError(msg) from None
 
 
 def convert(name: str, M_: mat_struct, vartype: str, length: str) -> str:
@@ -239,22 +242,35 @@ def convert(name: str, M_: mat_struct, vartype: str, length: str) -> str:
     -------
     str
         The converted variable name.
+
     """
-    if vartype == 'endo':
-        if length == 'short':
+    msg = "length must be 'short' or 'long'."
+    if vartype == "endo":
+        if length == "short":
             return to_endo_name_short(name, M_)
-        elif length == 'long':
+        if length == "long":
             return to_endo_name_long(name, M_)
-    elif vartype == 'exo':
-        if length == 'short':
+        raise ValueError(msg)
+    if vartype == "exo":
+        if length == "short":
             return to_exo_name_short(name, M_)
-        elif length == 'long':
+        if length == "long":
             return to_exo_name_long(name, M_)
-    else:
-        raise ValueError("vartype must be 'endo' for endogenous or 'exo' for exogenous.")
+        raise ValueError(msg)
+    msg = "vartype must be 'endo' for endogenous or 'exo' for exogenous."
+    raise ValueError(msg)
 
 
-def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols: int=3, M_: mat_struct = None, xlabel: str = None, ylabel: str = None, suptitle: str = None) -> Figure:
+def plot_irf_df(
+    df: pd.DataFrame,
+    endo_names: list[str],
+    shock_name: str,
+    n_cols: int = 3,
+    M_: mat_struct = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    suptitle: str | None = None,
+) -> Figure:
     irf_df = df[endo_names]
 
     n_series = irf_df.shape[1]  # Number of series (columns)
@@ -266,21 +282,21 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
     for i, col in enumerate(irf_df.columns):
         if M_ is not None:
             # If M_ is specified, convert to long name
-            title = convert(col, M_, vartype='endo', length='long')
+            title = convert(col, M_, vartype="endo", length="long")
             if suptitle is None:
                 # If suptitle is not specified, convert shock name to long name
-                suptitle = convert(shock_name, M_, vartype='exo', length='long')
+                suptitle = convert(shock_name, M_, vartype="exo", length="long")
         else:
             title = col
         ax = axes[i]
         ax.plot(irf_df[col])
         ax.set_title(title)
-        ax.axhline(0, color='gray', linestyle='--')
-        ax.grid(True)
+        ax.axhline(0, color="gray", linestyle="--")
+        ax.grid()
 
         if xlabel is not None:
             ax.set_xlabel(xlabel)
-        
+
         if ylabel is not None:
             ax.set_ylabel(ylabel)
 
@@ -294,29 +310,41 @@ def plot_irf_df(df: pd.DataFrame, endo_names: list[str], shock_name: str, n_cols
 
 
 def dump_figure(fig: Figure) -> bytes:
+    """Serialize a matplotlib Figure object to bytes using pickle.
+
+    Parameters
+    ----------
+    fig : Figure
+        The matplotlib Figure object to serialize.
+
+    Returns
+    -------
+    bytes
+        The pickled bytes representation of the figure and related info.
+
+    """
     info = {
-        'figure': fig,
-        'matplotlib_version': matplotlib.__version__,
-        'pickle_protocol': pickle.HIGHEST_PROTOCOL
+        "figure": fig,
+        "matplotlib_version": mpl.__version__,
+        "pickle_protocol": pickle.HIGHEST_PROTOCOL,
     }
     return pickle.dumps(info, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def main():
-
-    data = load('sample.mat')
-    oo_ = data['oo_']
-    M_ = data['M_']
+def main() -> None:
+    """Load sample data, extract IRFs, and plot results."""
+    data = load("sample.mat")
+    oo_ = data["oo_"]
+    M_ = data["M_"]  # noqa: N806
 
     shock_dfs = get_irf(oo_, M_)
     # ✅ Check results (example: IRF for shock 'eu')
 
-    df = shock_dfs['eps_u']
+    df = shock_dfs["eps_u"]  # noqa: PD901
 
-    plot_irf_df(df, df.columns, 'eps_u', M_=M_, n_cols=2)
+    plot_irf_df(df, df.columns, "eps_u", M_=M_, n_cols=2)
     plt.show()
 
 
 if __name__ == "__main__":
     main()
-
