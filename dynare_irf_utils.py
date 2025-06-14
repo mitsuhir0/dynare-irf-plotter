@@ -270,8 +270,14 @@ def plot_irf_df(
     xlabel: str | None = None,
     ylabel: str | None = None,
     suptitle: str | None = None,
+    irf_threshold: float = 1e-10,
 ) -> Figure:
     irf_df = df[endo_names]
+
+    # For each column, if max(abs(series)) < irf_threshold, set all values to 0
+    for col in irf_df.columns:
+        if np.nanmax(np.abs(irf_df[col].values)) < irf_threshold:
+            irf_df[col] = 0
 
     n_series = irf_df.shape[1]  # Number of series (columns)
     n_rows = math.ceil(n_series / n_cols)
@@ -293,6 +299,7 @@ def plot_irf_df(
         ax.set_title(title)
         ax.axhline(0, color="gray", linestyle="--")
         ax.grid()
+        ax.set_xlim(left=0)  # x軸の左端を0に固定
 
         if xlabel is not None:
             ax.set_xlabel(xlabel)

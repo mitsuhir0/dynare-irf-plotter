@@ -190,7 +190,7 @@ if mat_file_path is not None:
         selected_endo_names_long = st.multiselect(
             "Select endogenous variables to plot:",
             options=endo_names_long,
-            default=endo_names_long[:5],
+            default=endo_names_long[:],
         )
         if selected_endo_names_long:
             selected_endo_names_short = convert_selected_endo_names(
