@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import scipy.io
 import streamlit as st
@@ -98,6 +99,9 @@ def get_shock_lists(
     return shock_list, long_shock_list
 
 
+plot_threshold = 1e-10
+
+
 def plot_and_download_irf(
     irf_data_list: list,
     var_names: list,
@@ -120,6 +124,7 @@ def plot_and_download_irf(
         M_=style_options["M_"],
         xlabel=style_options["xlabel"],
         ylabel=style_options["ylabel"],
+        irf_threshold=plot_threshold,
     )
     st.pyplot(fig)
     with st.expander("Display IRF Data"):
@@ -165,7 +170,7 @@ st.markdown(text.tool_description())
 with st.expander("How to Use"):
     st.markdown(text.instructions())
 
-# --- MATファイルアップロードUI ---
+# --- MAT file upload UI ---
 use_sample_file = st.checkbox("Try the demo with a sample MAT file")
 if use_sample_file:
     with st.expander("About the sample.mat file"):
@@ -204,7 +209,7 @@ if mat_file_paths:
     if any(oo is None for oo in oo_list):
         st.error("At least one MAT file does not contain 'oo_' data.")
     else:
-        # 共通の変数・ショック名を取得
+        # Variable and shock selection
         endo_names_long_sets = [
             set(get_endo_names_long(oo, M))
             for oo, M in zip(oo_list, M_list, strict=False)
@@ -267,7 +272,7 @@ if mat_file_paths:
                     ),
                     step=1,
                 )
-            # --- ここからmatファイルごとの描画オプション ---
+            # --- Per-MAT file plot style options ---
             marker_choices = ["o", "s", "^", "D", "v", "x", "*", "+", ".", "None"]
             linestyle_choices = ["-", "--", "-.", ":"]
             color_choices = [
@@ -376,7 +381,7 @@ if mat_file_paths:
             )
             # --- Save/Load Plot Options (YAML) UI ---
             st.markdown("#### Save/Load Plot Options (YAML)")
-            # --- Load (YAMLアップロード) UI ---
+            # --- Load (YAML upload) UI ---
             load_yaml_file = st.file_uploader(
                 "Upload a YAML file to load plot/UI options",
                 type=["yaml", "yml"],
@@ -401,28 +406,31 @@ if mat_file_paths:
                     st.session_state[rerun_flag] = True
                 except yaml.YAMLError as e:
                     yaml_load_error = True
-                    st.error(f"YAML file is invalid and was not loaded. Reason: {e}")
+                    st.error(
+                        f"YAML file is invalid and was not loaded. Reason: {e}",
+                    )
                     st.info("Please select a valid YAML file.")
-                    st.session_state[rerun_key] = False  # エラー時はフラグをリセット
+                    st.session_state[rerun_key] = False  # Reset flag on error
                     st.session_state[rerun_flag] = False
             else:
                 st.session_state[rerun_key] = False
                 st.session_state[rerun_flag] = False
 
-            # YAMLロード後に再描画ボタンを表示
+            # Show redraw button after YAML load
             if st.session_state.get(rerun_flag, False) and not yaml_load_error:
                 st.warning(
-                    "YAMLの設定を反映するには再描画が必要です。下のボタンを押してください。",
+                    "To apply the loaded YAML settings, "
+                    "please click the redraw button below.",
                 )
-                if st.button("再描画 / Redraw"):
+                if st.button("Redraw"):
                     st.session_state[rerun_flag] = False
                     st.rerun()
-            # --- Save (YAMLダウンロード) UI ---
+            # --- Save (YAML download) UI ---
             st.markdown("#### Save Plot Options (YAML Download)")
             plot_options = {}
             save_vars = [
-                # "selected_endo_names_long",  # 保存しない
-                # "selected_shock_long",      # 保存しない
+                # "selected_endo_names_long",  # do not save
+                # "selected_shock_long",      # do not save
                 "n_col",
                 "plot_xlabel",
                 "plot_ylabel",
@@ -435,8 +443,8 @@ if mat_file_paths:
                 "fig_height",
             ]
             for var in save_vars:
-                # 内製変数やショック名、selected_endo_names_long, selected_shock_longは
-                # YAML保存・ロード対象から除外する
+                # Exclude endo/shock names and selected_endo_names_long,
+                # selected_shock_long from YAML save/load
                 if var in (
                     "endo_names_long",
                     "shock_names",
@@ -460,6 +468,7 @@ if mat_file_paths:
             )
             st.markdown(download_link, unsafe_allow_html=True)
 
+            # --- Drawing and saving ---
             if selected_shock_long:
                 shock_name = convert(
                     selected_shock_long,
@@ -476,6 +485,14 @@ if mat_file_paths:
                     "Select file format to download:",
                     options=["png", "pdf", "eps", "svg", "pkl"],
                 )
+                # --- IRF thresholding for direct matplotlib plotting ---
+                for irf_dfs in shock_dfs_list:
+                    df = irf_dfs[shock_name]
+                    for col in df.columns:
+                        arr = df[col].to_numpy().copy()
+                        if np.nanmax(np.abs(arr)) < plot_threshold:
+                            arr[:] = 0
+                            df[col] = arr
                 fig, axes = plt.subplots(n_rows, n_col, figsize=(fig_width, fig_height))
                 if n_vars == 1:
                     axes = [[axes]]
@@ -523,7 +540,7 @@ if mat_file_paths:
                         or (legend_panel_mode == 1 and idx_var == 0)
                     ):
                         ax.legend()
-                # 不要なサブプロットを非表示
+                # Hide unused subplots
                 for idx in range(n_vars, n_rows * n_col):
                     row = idx // n_col
                     col = idx % n_col
@@ -572,6 +589,16 @@ if mat_file_paths:
                 st.warning("Please select at least one shock to plot.")
         else:
             st.warning("Please select at least one endogenous variable to plot.")
+
+# --- Multi-page support ---
+try:
+    import streamlit
+
+    if hasattr(streamlit, "sidebar"):
+        st.sidebar.page_link("app.py", label="IRF Plotter", icon="📈")
+        st.sidebar.page_link("documentation.py", label="Documentation", icon="📖")
+except Exception:
+    pass
 
 st.markdown("---")
 st.markdown(text.desclaimer())

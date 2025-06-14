@@ -276,8 +276,10 @@ def plot_irf_df(
 
     # For each column, if max(abs(series)) < irf_threshold, set all values to 0
     for col in irf_df.columns:
-        if np.nanmax(np.abs(irf_df[col].values)) < irf_threshold:
-            irf_df[col] = 0
+        arr = irf_df[col].to_numpy().copy()
+        if np.nanmax(np.abs(arr)) < irf_threshold:
+            arr[:] = 0
+            irf_df[col] = arr
 
     n_series = irf_df.shape[1]  # Number of series (columns)
     n_rows = math.ceil(n_series / n_cols)
