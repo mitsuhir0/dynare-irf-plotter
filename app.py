@@ -1,5 +1,6 @@
 """Streamlit app for visualizing Dynare IRFs from MATLAB .mat files."""
 
+import base64
 import io
 import math
 from pathlib import Path
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy.io
 import streamlit as st
-import yaml  # PyYAML for settings save/load
+import yaml
 from matplotlib.figure import Figure
 
 import text
@@ -43,7 +44,7 @@ def remove_suptitle(fig: Figure) -> Figure:
     return fig
 
 
-def get_mat_file(use_sample_file, uploaded_file) -> tuple:
+def get_mat_file(use_sample_file: bool, uploaded_file: object) -> tuple:
     """MATファイルのパスまたはアップロードファイルを返す"""
     if use_sample_file:
         sample_file_path = "sample.mat"
@@ -98,34 +99,34 @@ def get_shock_lists(
 
 
 def plot_and_download_irf(
-    irfs: pd.DataFrame,
-    selected_endo_names_short: list[str],
-    shock_name: str,
-    n_col: int,
-    M_: Mat,
-    xlabel: str,
-    ylabel: str,
-    perods: int,
-    mat_file_name: str,
-    fig_title: str,
-    file_format: str,
+    irf_data_list: list,
+    var_names: list,
+    shock_names: list,
+    style_options: list,
+    legend_labels: list,
+    legend_panel_mode: int,
+    show_grid: bool,
+    fig_width: float,
+    fig_height: float,
+    download_yaml: bool,
+    save_options: dict,
 ) -> None:
     """IRFプロットとダウンロード処理"""
     fig = plot_irf_df(
-        irfs[:perods],
-        selected_endo_names_short,
-        shock_name,
-        n_cols=n_col,
-        M_=M_,
-        xlabel=xlabel,
-        ylabel=ylabel,
+        irf_data_list,
+        var_names,
+        shock_names,
+        n_cols=style_options["n_col"],
+        M_=style_options["M_"],
+        xlabel=style_options["xlabel"],
+        ylabel=style_options["ylabel"],
     )
     st.pyplot(fig)
     with st.expander("Display IRF Data"):
-        st.write(irfs)
-    base_file_name = f"{mat_file_name}_{shock_name}"
-    fig_for_save = fig if fig_title else remove_suptitle(fig)
-    if file_format == "pkl":
+        st.write(irf_data_list)
+    base_file_name = f"{save_options['mat_file_name']}_{shock_names}"
+    fig_for_save = fig if save_options["fig_title"] else remove_suptitle(fig)
+    if save_options["file_format"] == "pkl":
         pkl_bytes = dump_figure(fig_for_save)
         st.download_button(
             label="Download as pkl",
@@ -137,18 +138,18 @@ def plot_and_download_irf(
             st.markdown(text.about_pkl())
     else:
         buffer = io.BytesIO()
-        fig_for_save.savefig(buffer, format=file_format)
+        fig_for_save.savefig(buffer, format=save_options["file_format"])
         buffer.seek(0)
         mime_type = {
             "png": "image/png",
             "eps": "application/postscript",
             "pdf": "application/pdf",
             "svg": "image/svg+xml",
-        }[file_format]
+        }[save_options["file_format"]]
         st.download_button(
-            label=f"Download as {file_format}",
+            label=f"Download as {save_options['file_format']}",
             data=buffer,
-            file_name=f"{base_file_name}.{file_format}",
+            file_name=f"{base_file_name}.{save_options['file_format']}",
             mime=mime_type,
         )
 
@@ -178,25 +179,6 @@ if not use_sample_file:
         disabled=use_sample_file,
         accept_multiple_files=True,
     )
-
-# --- Load Plot Options (YAMLアップロード) UI ---
-st.markdown("#### Load Plot Options (YAML Upload)")
-load_yaml_file = st.file_uploader(
-    "Upload a YAML file to load plot/UI options",
-    type=["yaml", "yml"],
-    key="yaml_upload",
-)
-if load_yaml_file is not None:
-    try:
-        loaded = yaml.safe_load(load_yaml_file)
-        for k, v in loaded.items():
-            st.session_state[k] = v
-        st.success(
-            f"Plot options loaded from {load_yaml_file.name}. "
-            "Please reselect files if needed.",
-        )
-    except Exception as e:
-        st.error(f"Failed to load plot options: {e}")
 
 mat_file_paths = []
 mat_file_names = []
@@ -275,12 +257,12 @@ if mat_file_paths:
                     "Y-axis label:",
                     value=st.session_state.get("plot_ylabel", "Response"),
                 )
-                perods = st.number_input(
+                periods = st.number_input(
                     "Number of periods to plot:",
                     min_value=1,
                     max_value=100,
                     value=st.session_state.get(
-                        "perods",
+                        "periods",
                         len(shock_dfs_list[0][common_shocks[0]]),
                     ),
                     step=1,
@@ -368,10 +350,9 @@ if mat_file_paths:
             )
             legend_panel_mode = st.selectbox(
                 "Legend display mode:",
-                ["all panels", "first panel only"],
-                index=["all panels", "first panel only"].index(
-                    st.session_state.get("legend_panel_mode", "all panels"),
-                ),
+                options=[0, 1],
+                index=st.session_state.get("legend_panel_mode", 0),
+                format_func=lambda x: "all panels" if x == 0 else "first panel only",
             )
             n_vars = len(selected_endo_names_long)
             n_rows = math.ceil(n_vars / n_col)
@@ -393,18 +374,59 @@ if mat_file_paths:
                 value=st.session_state.get("fig_height", 3 * n_rows),
                 step=1,
             )
-            # --- Save Plot Options (YAMLダウンロード) UI ---
-            st.markdown("#### Save Plot Options (YAML Download)")
-            import base64
+            # --- Save/Load Plot Options (YAML) UI ---
+            st.markdown("#### Save/Load Plot Options (YAML)")
+            # --- Load (YAMLアップロード) UI ---
+            load_yaml_file = st.file_uploader(
+                "Upload a YAML file to load plot/UI options",
+                type=["yaml", "yml"],
+                key="yaml_upload",
+            )
+            yaml_load_error = False
+            rerun_key = "yaml_rerun_done"
+            rerun_flag = "yaml_needs_rerun"
+            if load_yaml_file is not None:
+                try:
+                    loaded = yaml.safe_load(load_yaml_file)
+                    legend_mode = loaded.get("legend_panel_mode", 0)
+                    if not isinstance(legend_mode, int) or legend_mode not in (0, 1):
+                        legend_mode = 0
+                    for k, v in loaded.items():
+                        if k in ("endo_names_long", "shock_names"):
+                            continue
+                        if k == "legend_panel_mode":
+                            st.session_state[k] = legend_mode
+                        else:
+                            st.session_state[k] = v
+                    st.session_state[rerun_flag] = True
+                except yaml.YAMLError as e:
+                    yaml_load_error = True
+                    st.error(f"YAML file is invalid and was not loaded. Reason: {e}")
+                    st.info("Please select a valid YAML file.")
+                    st.session_state[rerun_key] = False  # エラー時はフラグをリセット
+                    st.session_state[rerun_flag] = False
+            else:
+                st.session_state[rerun_key] = False
+                st.session_state[rerun_flag] = False
 
+            # YAMLロード後に再描画ボタンを表示
+            if st.session_state.get(rerun_flag, False) and not yaml_load_error:
+                st.warning(
+                    "YAMLの設定を反映するには再描画が必要です。下のボタンを押してください。",
+                )
+                if st.button("再描画 / Redraw"):
+                    st.session_state[rerun_flag] = False
+                    st.rerun()
+            # --- Save (YAMLダウンロード) UI ---
+            st.markdown("#### Save Plot Options (YAML Download)")
             plot_options = {}
             save_vars = [
-                "selected_endo_names_long",
-                "selected_shock_long",
+                # "selected_endo_names_long",  # 保存しない
+                # "selected_shock_long",      # 保存しない
                 "n_col",
                 "plot_xlabel",
                 "plot_ylabel",
-                "perods",
+                "periods",
                 "file_plot_options",
                 "show_legend",
                 "legend_panel_mode",
@@ -413,15 +435,30 @@ if mat_file_paths:
                 "fig_height",
             ]
             for var in save_vars:
-                if var in locals():
+                # 内製変数やショック名、selected_endo_names_long, selected_shock_longは
+                # YAML保存・ロード対象から除外する
+                if var in (
+                    "endo_names_long",
+                    "shock_names",
+                    "common_endo_names_long",
+                    "common_shocks",
+                    "long_shock_list",
+                    "selected_endo_names_long",
+                    "selected_shock_long",
+                ):
+                    continue
+                if var == "legend_panel_mode":
+                    val = 0 if legend_panel_mode in (0,) else 1
+                    plot_options[var] = val
+                elif var in locals():
                     plot_options[var] = locals()[var]
             yaml_str = yaml.dump(plot_options, allow_unicode=True, sort_keys=False)
             b64 = base64.b64encode(yaml_str.encode()).decode()
-            href = (
-                f'<a href="data:text/yaml;base64,{b64}" download="irf_plot_options.yaml">'
-                "Download current plot options as YAML</a>"
+            download_link = (
+                f'<a href="data:text/yaml;base64,{b64}" '
+                'download="irf_plot_options.yaml">Download YAML</a>'
             )
-            st.markdown(href, unsafe_allow_html=True)
+            st.markdown(download_link, unsafe_allow_html=True)
 
             if selected_shock_long:
                 shock_name = convert(
@@ -459,7 +496,7 @@ if mat_file_paths:
                         strict=False,
                     ):
                         var_short = endo_short[idx_var]
-                        irfs = irf_dfs[shock_name][:perods]
+                        irfs = irf_dfs[shock_name][:periods]
                         ax.plot(
                             irfs.index,
                             irfs[var_short],
@@ -467,11 +504,8 @@ if mat_file_paths:
                                 plot_opt["legend_label"]
                                 if show_legend
                                 and (
-                                    legend_panel_mode == "all panels"
-                                    or (
-                                        legend_panel_mode == "first panel only"
-                                        and idx_var == 0
-                                    )
+                                    legend_panel_mode == 0
+                                    or (legend_panel_mode == 1 and idx_var == 0)
                                 )
                                 else None
                             ),
@@ -485,8 +519,8 @@ if mat_file_paths:
                     ax.set_xlabel(plot_xlabel)
                     ax.set_ylabel(plot_ylabel)
                     if show_legend and (
-                        legend_panel_mode == "all panels"
-                        or (legend_panel_mode == "first panel only" and idx_var == 0)
+                        legend_panel_mode == 0
+                        or (legend_panel_mode == 1 and idx_var == 0)
                     ):
                         ax.legend()
                 # 不要なサブプロットを非表示
@@ -505,7 +539,7 @@ if mat_file_paths:
                         strict=False,
                     ):
                         st.write(f"{mat_name}")
-                        st.write(irf_dfs[shock_name][:perods])
+                        st.write(irf_dfs[shock_name][:periods])
                 base_file_name = f"{'_'.join(mat_file_names)}_{shock_name}"
                 fig_for_save = fig if include_title else remove_suptitle(fig)
                 if file_format == "pkl":
